@@ -34,6 +34,7 @@
           </div>
           <button type="submit" class="m-1 bg-pink-800 text-white">init escrow</button>
         </form>
+        <button @click="cancelEscrowFE" class="m-1 bg-red-800 text-white">CANCEL ESCROW</button>
       </div>
 
       <div class="bg-blue-200 flex-1 m-10">
@@ -73,7 +74,7 @@
 
     <div class="bg-gray-200 m-10">
       <h3 class="font-bold m-1">Program</h3>
-      <form @submit.prevent="" class="flex flex-row">
+      <form @submit.prevent="updateEscrowInfo" class="flex flex-row">
         <div class="flex-1 mr-10">
           <div class="flex flex-row m-1">
             <label for="program_id">Program ID:</label>
@@ -83,7 +84,7 @@
             <label for="escrow_acc">Escrow Account:</label>
             <input type="text" id="escrow_acc" v-model="escrow_acc" class="flex-grow" @change="updateEscrowInfo">
           </div>
-          <button type="submit" class="m-1 bg-gray-800 text-white">reset escrow</button>
+          <button type="submit" class="m-1 bg-gray-800 text-white">update escrow info</button>
         </div>
         <div class="flex-1 ml-10">
           <div class="m-1">Initialized: {{ is_initialized }}</div>
@@ -104,6 +105,7 @@
 
 <script>
 import {
+  cancelEscrow,
   connect,
   CONNECTION,
   getBalance, getEscrowInfo,
@@ -138,8 +140,8 @@ export default {
       b_x_balance: new BigNumber("0").toString(),
       b_y_balance: new BigNumber("0").toString(),
       // ----------------------------------------------------------------------------- Program
-      program_id: "5B7bxDnoCG9PvCnSHLN65KvTy1BsUX4oxDmaQpjBPSG",
-      escrow_acc: "Fqt59CYejnQGaCgHTP79LvKdXYf91JNXXX99vK7SkrE5", //derived from program id
+      program_id: "FCt8ibWB4FqZ15iUCQ3KfoRTHqMNEbVr8vKyFQWBB5mK",
+      escrow_acc: "",
 
       is_initialized: false,
       initializer: "",
@@ -250,6 +252,18 @@ export default {
     },
     async runWalletFE() {
       await connectWallet()
+    },
+    async cancelEscrowFE() {
+      console.log('cancelling escrow');
+      await cancelEscrow(
+          this.a_pk,
+          this.initializer_x_temp_acc,
+          this.a_x_acc,
+          this.escrow_acc,
+          this.program_id
+      );
+      //after we're done let's also refresh the pulled state
+      await this.updateAll();
     }
   },
   async created() {

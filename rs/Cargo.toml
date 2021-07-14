@@ -12,7 +12,8 @@ thiserror = "1.0.24"
 spl-token = {version = "3.1.1", features = ["no-entrypoint"]}
 arrayref = "0.3.6"
 
-#[features]
+[features]
+no-entrypoint = [] # in case others want to use our lib without the entrypoint
 #test-bpf = []
 
 #[dev-dependencies]

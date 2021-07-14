@@ -7,7 +7,7 @@ use crate::processor::Processor;
 entrypoint!(process_instruction);
 
 fn process_instruction(
-    program_id: &Pubkey,
+    program_id: &Pubkey, //the id of the escrow program
     accounts: &[AccountInfo],
     instruction_data: &[u8],
 ) -> ProgramResult {

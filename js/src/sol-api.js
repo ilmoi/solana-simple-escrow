@@ -217,7 +217,7 @@ async function takeTrade(
   initializerYTokenAccountPubkeyString,
   takerExpectedXAmount,
   escrowAccountPubkeyString,
-  tokenProgramIdString,
+  escrowProgamIdString,
 ) {
   const privateKeyDecoded = privateKeyByteArray.split(',').map(s => parseInt(s));
   const takerAccount = new Account(privateKeyDecoded);
@@ -230,11 +230,11 @@ async function takeTrade(
   const initializerYTokenPubkey = new PublicKey(initializerYTokenAccountPubkeyString);
 
   const escrowAccount = new PublicKey(escrowAccountPubkeyString);
-  const programId = new PublicKey(tokenProgramIdString);
+  const programId = new PublicKey(escrowProgamIdString);
   const pdaAccount = await PublicKey.findProgramAddress([Buffer.from("escrow")], programId);
 
   const takeTradeIx = new TransactionInstruction({
-    programId,
+    programId, //escrow program id - what's interesting is that when we "build" a tx we don't actually send it to one place - instead this acts as a guide as to which program should execute which instruction
     keys: [
       // 0. `[signer]` The account of the person taking the trade
       {pubkey: takerAccount.publicKey, isSigner: true, isWritable: false},
@@ -258,12 +258,68 @@ async function takeTrade(
     data: Buffer.from(Uint8Array.of(1, ...new BN(takerExpectedXAmount).toArray("le", 8)))
   })
 
-  console.log(takeTradeIx)
-
   const tx = new Transaction().add(takeTradeIx)
   let txHash = await sendAndConfirmTransaction(CONNECTION, tx, [takerAccount]);
   console.log(txHash);
 }
+
+// ----------------------------------------------------------------------------- cancel escrow
+
+async function cancelEscrow(
+  privateKeyByteArray,
+  tempXAccString,
+  initializerXAccString,
+  escrowAccString,
+  programIdString,
+) {
+  // initializer
+  const privateKeyDecoded = privateKeyByteArray.split(',').map(s => parseInt(s));
+  const initializerAccount = new Account(privateKeyDecoded);
+
+  // existing accounts
+  const tempXAcc = new PublicKey(tempXAccString);
+  const initializerXAcc = new PublicKey(initializerXAccString);
+  const escrowAcc = new PublicKey(escrowAccString);
+
+  //program id
+  const programId = new PublicKey(programIdString);
+
+  // pda
+  const seeds = [Buffer.from("escrow")];
+  const pdaAccount = await PublicKey.findProgramAddress(seeds, programId);
+  const nonce = pdaAccount[1];
+  const seedsWithNonce = seeds.concat(Buffer.from([nonce]));
+  console.log(pdaAccount);
+  console.log(seedsWithNonce);
+
+  let finalBuffer = Uint8Array.of(2, ...seedsWithNonce[0], ...seedsWithNonce[1]);
+  console.log(finalBuffer);
+
+  const cancelEscrowIx = new TransactionInstruction({
+    programId,
+    keys: [
+      /// 0 [signer] initializer's main account
+      {pubkey: initializerAccount.publicKey, isSigner: true, isWritable: false},
+      /// 1 [] token program account
+      {pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false},
+      /// 2 [writable] temp x account
+      {pubkey: tempXAcc, isSigner: false, isWritable: true},
+      /// 3 [writable] initializer's x account (writable coz we'll update their balance with new coins)
+      {pubkey: initializerXAcc, isSigner: false, isWritable: true},
+      /// 4 [writable] escrow account
+      {pubkey: escrowAcc, isSigner: false, isWritable: true},
+      /// 5 [] pda acc
+      {pubkey: pdaAccount[0], isSigner: false, isWritable: false},
+    ],
+    data: Buffer.from(finalBuffer)
+    // data: Buffer.from(Uint8Array.of(1, ...new BN(123).toArray("le", 8)))
+  })
+
+  const tx = new Transaction().add(cancelEscrowIx);
+  const txHash = await sendAndConfirmTransaction(CONNECTION, tx, [initializerAccount])
+  console.log(txHash);
+}
+
 
 // ----------------------------------------------------------------------------- wallet
 
@@ -316,7 +372,7 @@ async function takeTrade(
 
 module.exports = {
   CONNECTION, connect, getTokenBalance, getBalance, getEscrowInfo,
-  initEscrow, takeTrade
+  initEscrow, takeTrade, cancelEscrow
 }
 
 // ----------------------------------------------------------------------------- play

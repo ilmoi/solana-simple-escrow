@@ -1,23 +1,27 @@
 use solana_program::{
     account_info::{next_account_info, AccountInfo},
     entrypoint::ProgramResult,
-    program_error::ProgramError,
     msg,
-    pubkey::Pubkey,
-    program_pack::{Pack, IsInitialized},
-    sysvar::{rent::Rent, Sysvar},
     program::{invoke, invoke_signed},
+    program_error::ProgramError,
+    program_pack::{IsInitialized, Pack},
+    pubkey::Pubkey,
+    sysvar::{rent::Rent, Sysvar},
 };
 
 use spl_token::state::Account as TokenAccount;
 
-use crate::{instruction::EscrowInstruction, error::EscrowError};
 use crate::state::Escrow;
+use crate::{error::EscrowError, instruction::EscrowInstruction};
 
 pub struct Processor;
 
 impl Processor {
-    pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], instruction_data: &[u8]) -> ProgramResult {
+    pub fn process(
+        program_id: &Pubkey,
+        accounts: &[AccountInfo],
+        instruction_data: &[u8],
+    ) -> ProgramResult {
         // remember it's looking for the 0 byte to kick of the program (InitEscrow)
         let instruction = EscrowInstruction::unpack(instruction_data)?;
 
@@ -29,6 +33,10 @@ impl Processor {
             EscrowInstruction::Exchange { amount } => {
                 msg!("Instruction: Exchange");
                 Self::process_exchange(accounts, amount, program_id)
+            }
+            EscrowInstruction::Cancel => {
+                msg!("Instruction: Cancel");
+                Self::cancel_exchange(accounts, program_id)
             }
         }
     }
@@ -112,9 +120,9 @@ impl Processor {
         // set_authority = helper function that allows us to use a builder pattern to create an ix that we'll pass on later
         // https://docs.rs/spl-token/3.1.1/spl_token/instruction/fn.set_authority.html
         let owner_change_ix = spl_token::instruction::set_authority(
-            token_program.key, // this is the id of the token_program
+            token_program.key,      // this is the id of the token_program
             temp_token_account.key, //this is the account whose authority we'd like to change
-            Some(&pda), // the account's new authority
+            Some(&pda),             // the account's new authority
             spl_token::instruction::AuthorityType::AccountOwner, // the type of authority change (diff types exist)
             initializer.key, // the current account owner's pubkey
             // (!) this is key - When including a signed account in a program call, in all CPIs including that account made by that program inside the current instruction, the account will also be signed, i.e. the signature is extended to the CPIs.
@@ -130,7 +138,7 @@ impl Processor {
             &owner_change_ix,
             &[
                 temp_token_account.clone(), //temporary account
-                initializer.clone(),  // the signer's account
+                initializer.clone(),        // the signer's account
                 token_program.clone(), // It's a rule that the program being called through a CPI must be included as an account in the 2nd argument of invoke
             ],
         )?;
@@ -229,7 +237,7 @@ impl Processor {
             pda_temp_x_acc.key,
             taker_x_acc.key,
             &pda,
-            &[&pda], //todo pda here??
+            &[&pda],
             pda_temp_x_info.amount,
         )?;
 
@@ -244,9 +252,10 @@ impl Processor {
         invoke_signed(
             &transfer_to_taker_ix,
             &[
+                //the order DOES NOT MATTER
                 pda_temp_x_acc.clone(),
                 taker_x_acc.clone(),
-                pda_acc.clone(),
+                pda_acc.clone(), //has to be passed into the instruction to prevent preimage attacks
                 token_program_acc.clone(),
             ],
             &[&[&b"escrow"[..], &[bump_seed]]],
@@ -260,7 +269,7 @@ impl Processor {
         // we close the account by transferring its "rent-exempt" balance out of it
         let close_pdas_temp_acc_ix = spl_token::instruction::close_account(
             token_program_acc.key,
-            pda_temp_x_acc.key, //from temp account
+            pda_temp_x_acc.key,       //from temp account
             initializer_main_acc.key, //to initializer main account
             &pda,
             &[&pda],
@@ -282,12 +291,121 @@ impl Processor {
 
         msg!("Closing the escrow account...");
 
-        **initializer_main_acc.lamports.borrow_mut() = initializer_main_acc.lamports()
+        **initializer_main_acc.lamports.borrow_mut() = initializer_main_acc
+            .lamports()
             .checked_add(escrow_acc.lamports())
             .ok_or(EscrowError::AmountOverflow)?; //add the balance to initializer's acc
 
         **escrow_acc.lamports.borrow_mut() = 0; //empty the balance
         *escrow_acc.data.borrow_mut() = &mut []; //AND zero out its data
+
+        Ok(())
+    }
+
+    fn cancel_exchange(accounts: &[AccountInfo], program_id: &Pubkey) -> ProgramResult {
+        // ----------------------------------------------------------------------------- get accs
+        let accounts_info_iter = &mut accounts.iter();
+
+        let initializer_main_acc = next_account_info(accounts_info_iter)?;
+        let token_program_acc = next_account_info(accounts_info_iter)?;
+        let temp_x_acc = next_account_info(accounts_info_iter)?;
+        let initializer_x_acc = next_account_info(accounts_info_iter)?;
+        let escrow_acc = next_account_info(accounts_info_iter)?;
+        let pda_acc = next_account_info(accounts_info_iter)?;
+
+        // ----------------------------------------------------------------------------- checks
+        // deserialize the escrow account
+        let escrow_info = Escrow::unpack(&escrow_acc.data.borrow())?;
+
+        // check that the sender is indeed the initializer who created the escrow
+        if escrow_info.initializer_pubkey != *initializer_main_acc.key {
+            return Err(ProgramError::InvalidAccountData);
+        }
+
+        // check that initializer is listed as signer
+        if !initializer_main_acc.is_signer {
+            return Err(ProgramError::MissingRequiredSignature);
+        }
+
+        // check that temp_x_acc is what we're expecting
+        if escrow_info.temp_token_account_pubkey != *temp_x_acc.key {
+            return Err(ProgramError::InvalidAccountData);
+        }
+
+        // ----------------------------------------------------------------------------- send x token back
+
+        // todo You can also pass the bump_seed into the program so the program can use the quicker Pubkey::create_program_address call
+        let (pda, bump_seed) = Pubkey::find_program_address(&[b"escrow"], program_id);
+
+        // >>> cool so the below won't fly. Their dev on discord told
+        // let sys_prog_id = solana_program::system_program::id();
+        // let mut empty_data = [0_u8];
+        // let mut empty_lamports = 0_u64;
+        // AccountInfo { key: 2CVTH6qZCuYWyCPigStv7rTPfaCW9FTmFtzTfq3u8LBU owner: 11111111111111111111111111111111 is_signer: false is_writable: false executable: false rent_epoch: 0 lamports: 0 data.len: 0  }
+        // let pda_acc = AccountInfo::new(
+        //     &pda,
+        //     false,
+        //     false,
+        //     &mut empty_lamports,
+        //     &mut empty_data,
+        //     &sys_prog_id,
+        //     false,
+        //     0,
+        // );
+
+        // similarly to our Escrow, pack/unpack turns a slice into an actual account info
+        let temp_x_info = TokenAccount::unpack(&temp_x_acc.data.borrow())?;
+
+        let transfer_x_tokens_back_ix = spl_token::instruction::transfer(
+            token_program_acc.key,
+            temp_x_acc.key,
+            initializer_x_acc.key,
+            &pda,
+            &[&pda],
+            temp_x_info.amount, //get the amount in x tokens programmatically
+        )?;
+
+        //invoke here because we're asking the token program to do something for us
+        invoke_signed(
+            &transfer_x_tokens_back_ix,
+            &[
+                temp_x_acc.clone(),
+                initializer_x_acc.clone(),
+                pda_acc.clone(),
+                token_program_acc.clone(),
+            ],
+            &[&[&b"escrow"[..], &[bump_seed]]],
+        )?;
+
+        // ----------------------------------------------------------------------------- clean up
+
+        //1) close the temp acc by transferring rent out of it
+        let close_temp_x_acc_ix = spl_token::instruction::close_account(
+            token_program_acc.key,
+            temp_x_acc.key,
+            initializer_x_acc.key,
+            &pda,
+            &[&pda],
+        )?;
+
+        invoke_signed(
+            &close_temp_x_acc_ix,
+            &[
+                temp_x_acc.clone(),
+                initializer_x_acc.clone(),
+                pda_acc.clone(),
+                token_program_acc.clone(),
+            ],
+            &[&[&b"escrow"[..], &[bump_seed]]],
+        )?;
+
+        //2) close the escrow acc by transferring rent out of it AND zeroing out the data
+        **initializer_main_acc.lamports.borrow_mut() = initializer_main_acc
+            .lamports()
+            .checked_add(escrow_acc.lamports())
+            .ok_or(EscrowError::AmountOverflow)?;
+        **escrow_acc.lamports.borrow_mut() = 0;
+        *escrow_acc.data.borrow_mut() = &mut [];
 
         Ok(())
     }

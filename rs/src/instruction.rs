@@ -37,6 +37,14 @@ pub enum EscrowInstruction {
         /// the amount the taker expects to be paid in the other token, as a u64 because that's the max possible supply of a token
         amount: u64,
     },
+
+    /// 0 [signer] initializer's main account
+    /// 1 [] token program account
+    /// 2 [writable] temp x account
+    /// 3 [writable] initializer's x account (writable coz we'll update their balance with new coins)
+    /// 4 [writable] escrow account
+    /// 5 [] pda acc
+    Cancel
 }
 
 impl EscrowInstruction {
@@ -53,6 +61,7 @@ impl EscrowInstruction {
             1 => Self::Exchange {
                 amount: Self::unpack_amount(rest)?
             },
+            2 => Self::Cancel,
             _ => return Err(InvalidInstruction.into()),
         })
     }

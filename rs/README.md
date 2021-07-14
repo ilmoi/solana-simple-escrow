@@ -13,3 +13,9 @@ $ cargo test
 $ cargo build-bpf
 $ cargo test-bpf
 ```
+
+### Deploy
+
+```
+solana program deploy /path/to/compiled_binary
+```

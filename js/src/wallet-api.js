@@ -28,7 +28,7 @@ async function takeTradeSigned(
   initializerYTokenAccountPubkeyString,
   takerExpectedXAmount,
   escrowAccountPubkeyString,
-  tokenProgramIdString,
+  escrowProgramIdString,
 ) {
   const CONNECTION = new Connection('http://localhost:8899', 'confirmed');
 
@@ -42,7 +42,7 @@ async function takeTradeSigned(
   const initializerYTokenPubkey = new PublicKey(initializerYTokenAccountPubkeyString);
 
   const escrowAccount = new PublicKey(escrowAccountPubkeyString);
-  const programId = new PublicKey(tokenProgramIdString);
+  const programId = new PublicKey(escrowProgramIdString);
   const pdaAccount = await PublicKey.findProgramAddress([Buffer.from("escrow")], programId);
 
   const takeTradeIx = new TransactionInstruction({
