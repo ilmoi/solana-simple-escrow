@@ -35,6 +35,7 @@ async function connect() {
   //nice, we can specify the level of committment we want from the network on tx confirmation - https://solana-labs.github.io/solana-web3.js/modules.html#commitment
   CONNECTION = new Connection(rpcUrl, 'confirmed');
   console.log('1) CONNECTED:', await CONNECTION.getVersion());
+  return CONNECTION
 }
 
 //tokenAccount = base58 encoded string
@@ -264,6 +265,31 @@ async function takeTrade(
   console.log(txHash);
 }
 
+// ----------------------------------------------------------------------------- wallet
+
+// async function prepThisWallet() {
+//   let providerUrl = 'https://www.sollet.io';
+//   let wallet = new Wallet(providerUrl, 'localhost');
+//   wallet.on('connect', publicKey => console.log('Connected to ' + publicKey.toBase58()));
+//   wallet.on('disconnect', () => console.log('Disconnected'));
+//   await wallet.connect();
+//
+//   // let transaction = new Transaction().add(
+//   //   SystemProgram.transfer({
+//   //     fromPubkey: wallet.publicKey,
+//   //     toPubkey: wallet.publicKey,
+//   //     lamports: 100,
+//   //   })
+//   // );
+//   // let {blockhash} = await CONNECTION.getRecentBlockhash();
+//   // transaction.recentBlockhash = blockhash;
+//   // transaction.feePayer = wallet.publicKey;
+//   // let signed = await wallet.signTransaction(transaction);
+//   // let txid = await CONNECTION.sendRawTransaction(signed.serialize());
+//   // await CONNECTION.confirmTransaction(txid);
+//   return wallet
+// }
+
 // ----------------------------------------------------------------------------- helpers
 
 // async function getConfig() {
@@ -306,3 +332,5 @@ module.exports = {
 //   );
 //
 // takeTrade();
+
+

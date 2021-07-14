@@ -20,3 +20,4 @@ let x = new BigNumber(Number.MAX_SAFE_INTEGER);
 let y = x.plus(1);
 let z = x.plus(2);
 console.log(y.isEqualTo(z)); //false
+

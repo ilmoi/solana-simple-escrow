@@ -98,6 +98,7 @@
       </form>
     </div>
 
+    <button @click="runWalletFE">click me</button>
   </div>
 </template>
 
@@ -108,9 +109,10 @@ import {
   getBalance, getEscrowInfo,
   getInfo,
   getTokenBalance, initEscrow, takeTrade,
-} from "@/helper";
+} from "@/sol-api";
 import {LAMPORTS_PER_SOL, PublicKey} from "@solana/web3.js";
 import BigNumber from 'bignumber.js'
+import {connectWallet, takeTradeSigned} from "@/wallet-api";
 
 export default {
   data() {
@@ -232,8 +234,8 @@ export default {
     },
     async takeTradeFE() {
       console.log("taking the trade")
-      await takeTrade(
-          this.b_pk,
+      await takeTradeSigned(
+          // this.b_pk,
           this.b_x_acc,
           this.b_y_acc,
           this.initializer_x_temp_acc,
@@ -246,6 +248,9 @@ export default {
       //after we're done let's also refresh the pulled state
       await this.updateAll();
     },
+    async runWalletFE() {
+      await connectWallet()
+    }
   },
   async created() {
     await connect();
