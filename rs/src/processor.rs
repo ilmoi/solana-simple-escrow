@@ -34,9 +34,9 @@ impl Processor {
                 msg!("Instruction: Exchange");
                 Self::process_exchange(accounts, amount, program_id)
             }
-            EscrowInstruction::Cancel => {
+            EscrowInstruction::Cancel { bump_seed } => {
                 msg!("Instruction: Cancel");
-                Self::cancel_exchange(accounts, program_id)
+                Self::cancel_exchange(accounts, bump_seed, program_id)
             }
         }
     }
@@ -302,7 +302,11 @@ impl Processor {
         Ok(())
     }
 
-    fn cancel_exchange(accounts: &[AccountInfo], program_id: &Pubkey) -> ProgramResult {
+    fn cancel_exchange(
+        accounts: &[AccountInfo],
+        bump_seed: u8,
+        program_id: &Pubkey,
+    ) -> ProgramResult {
         // ----------------------------------------------------------------------------- get accs
         let accounts_info_iter = &mut accounts.iter();
 
@@ -332,12 +336,24 @@ impl Processor {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        // ----------------------------------------------------------------------------- send x token back
+        // ----------------------------------------------------------------------------- pda
 
-        // todo You can also pass the bump_seed into the program so the program can use the quicker Pubkey::create_program_address call
-        let (pda, bump_seed) = Pubkey::find_program_address(&[b"escrow"], program_id);
+        // APPROACH 1: FROM TUTORIAL - works
+        // let (pda, bump_seed) = Pubkey::find_program_address(&[b"escrow"], program_id);
+        // Program log: pda and seed are: 2CVTH6qZCuYWyCPigStv7rTPfaCW9FTmFtzTfq3u8LBU, 254
+        // msg!("pda and seed are: {}, {}", pda, bump_seed);
 
-        // >>> cool so the below won't fly. Their dev on discord told
+        // APPROACH 2a: PASS IN SEED DIRECTLY TO SAVE COMPUTATION - works
+        // Program log: passed pda pk is 2CVTH6qZCuYWyCPigStv7rTPfaCW9FTmFtzTfq3u8LBU
+        // msg!("passed pda pk is {}", pda_acc.key);
+        let pda = *pda_acc.key;
+
+        // APPROACH 2b: PASS IN SEED + DERIVE ADDR - didn't work
+        // Program log: pda2 + seed 3XgMWSze8cTg71hCBcErGgfndnf9KFUfmV13EzbiXhDB, 2
+        // let pda2 = Pubkey::create_program_address(&[&b"escrow"[..], &[bump_seed]], program_id)?;
+        // msg!("pda2 + seed {}, {}", pda2, bump_seed);
+
+        // APPROACH 3: MANUAL - didn't work
         // let sys_prog_id = solana_program::system_program::id();
         // let mut empty_data = [0_u8];
         // let mut empty_lamports = 0_u64;
@@ -352,6 +368,8 @@ impl Processor {
         //     false,
         //     0,
         // );
+
+        // ----------------------------------------------------------------------------- send x token back
 
         // similarly to our Escrow, pack/unpack turns a slice into an actual account info
         let temp_x_info = TokenAccount::unpack(&temp_x_acc.data.borrow())?;

@@ -1,5 +1,5 @@
-use std::convert::TryInto;
 use solana_program::program_error::ProgramError;
+use std::convert::TryInto;
 
 use crate::error::EscrowError::InvalidInstruction;
 
@@ -15,9 +15,7 @@ pub enum EscrowInstruction {
     /// 3. `[writable]` The escrow account, it will hold all necessary info about the trade.
     /// 4. `[]` The rent sysvar
     /// 5. `[]` The token program - the thing in the middle of his diagram. This would tbe "the smart contract" that we'd be interacting with in ethereum
-    InitEscrow {
-        amount: u64,
-    },
+    InitEscrow { amount: u64 },
 
     /// Accepts a trade
     ///
@@ -44,7 +42,7 @@ pub enum EscrowInstruction {
     /// 3 [writable] initializer's x account (writable coz we'll update their balance with new coins)
     /// 4 [writable] escrow account
     /// 5 [] pda acc
-    Cancel
+    Cancel { bump_seed: u8 },
 }
 
 impl EscrowInstruction {
@@ -59,9 +57,11 @@ impl EscrowInstruction {
                 amount: Self::unpack_amount(rest)?,
             },
             1 => Self::Exchange {
-                amount: Self::unpack_amount(rest)?
+                amount: Self::unpack_amount(rest)?,
             },
-            2 => Self::Cancel,
+            2 => Self::Cancel {
+                bump_seed: rest[0], //can do it directly coz we only have one byte to unpack
+            },
             _ => return Err(InvalidInstruction.into()),
         })
     }

@@ -287,12 +287,14 @@ async function cancelEscrow(
   // pda
   const seeds = [Buffer.from("escrow")];
   const pdaAccount = await PublicKey.findProgramAddress(seeds, programId);
-  const nonce = pdaAccount[1];
-  const seedsWithNonce = seeds.concat(Buffer.from([nonce]));
-  console.log(pdaAccount);
-  console.log(seedsWithNonce);
+  const bumpSeed = pdaAccount[1];
 
-  let finalBuffer = Uint8Array.of(2, ...seedsWithNonce[0], ...seedsWithNonce[1]);
+  // const seedsWithNonce = seeds.concat(Buffer.from([nonce]));
+  // console.log(pdaAccount);
+  // console.log(seedsWithNonce);
+  // let finalBuffer = Uint8Array.of(2, ...seedsWithNonce[0], ...seedsWithNonce[1]);
+
+  let finalBuffer = Uint8Array.of(2, bumpSeed);
   console.log(finalBuffer);
 
   const cancelEscrowIx = new TransactionInstruction({
