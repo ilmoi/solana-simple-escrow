@@ -323,30 +323,25 @@ async function cancelEscrow(
 }
 
 
-// ----------------------------------------------------------------------------- wallet
+// ----------------------------------------------------------------------------- derived addresses
 
-// async function prepThisWallet() {
-//   let providerUrl = 'https://www.sollet.io';
-//   let wallet = new Wallet(providerUrl, 'localhost');
-//   wallet.on('connect', publicKey => console.log('Connected to ' + publicKey.toBase58()));
-//   wallet.on('disconnect', () => console.log('Disconnected'));
-//   await wallet.connect();
-//
-//   // let transaction = new Transaction().add(
-//   //   SystemProgram.transfer({
-//   //     fromPubkey: wallet.publicKey,
-//   //     toPubkey: wallet.publicKey,
-//   //     lamports: 100,
-//   //   })
-//   // );
-//   // let {blockhash} = await CONNECTION.getRecentBlockhash();
-//   // transaction.recentBlockhash = blockhash;
-//   // transaction.feePayer = wallet.publicKey;
-//   // let signed = await wallet.signTransaction(transaction);
-//   // let txid = await CONNECTION.sendRawTransaction(signed.serialize());
-//   // await CONNECTION.confirmTransaction(txid);
-//   return wallet
-// }
+async function getTokenAccount(
+  ownerPublicKeyString,
+  mintPublicKeyString,
+) {
+  const ownerPublicKey = new PublicKey(ownerPublicKeyString);
+  const mintPublicKey = new PublicKey(mintPublicKeyString);
+  const filter = { mint: mintPublicKey};
+
+  let x = await CONNECTION.getTokenAccountsByOwner(
+    ownerPublicKey,
+    filter,
+    )
+
+  //todo in theory I should roll up but I'm just going to take the first one
+  console.log(x);
+  return x.value[0].pubkey.toBase58()
+}
 
 // ----------------------------------------------------------------------------- helpers
 
@@ -374,7 +369,7 @@ async function cancelEscrow(
 
 module.exports = {
   CONNECTION, connect, getTokenBalance, getBalance, getEscrowInfo,
-  initEscrow, takeTrade, cancelEscrow
+  initEscrow, takeTrade, cancelEscrow, getTokenAccount
 }
 
 // ----------------------------------------------------------------------------- play

@@ -13,6 +13,7 @@ use spl_token::state::Account as TokenAccount;
 
 use crate::state::Escrow;
 use crate::{error::EscrowError, instruction::EscrowInstruction};
+use solana_program::log::sol_log_compute_units;
 
 pub struct Processor;
 
@@ -76,7 +77,11 @@ impl Processor {
         // we are checking that the escrow account has enough balance to be exempt from rent
 
         // [4] here we're getting the rent sysvar from a separate account. After 1.6.4 this is no longer necessary
-        let rent = &Rent::from_account_info(next_account_info(account_info_iter)?)?;
+        // both of the below calls return this: Rent { lamports_per_byte_year: 3480, exemption_threshold: 2.0, burn_percent: 50 }
+        let _manual_rent = &Rent::from_account_info(next_account_info(account_info_iter)?)?;
+        let rent = &Rent::get()?;
+
+        // msg!("rent old, new: {:?}, {:?}", rent, rent_new);
 
         // make sure enough balance in the [3] ESCROW account to be exempt from rent
         if !rent.is_exempt(escrow_account.lamports(), escrow_account.data_len()) {
@@ -305,7 +310,7 @@ impl Processor {
     fn cancel_exchange(
         accounts: &[AccountInfo],
         bump_seed: u8,
-        program_id: &Pubkey,
+        _program_id: &Pubkey,
     ) -> ProgramResult {
         // ----------------------------------------------------------------------------- get accs
         let accounts_info_iter = &mut accounts.iter();
@@ -397,6 +402,8 @@ impl Processor {
 
         // ----------------------------------------------------------------------------- clean up
 
+        sol_log_compute_units();
+
         //1) close the temp acc by transferring rent out of it
         let close_temp_x_acc_ix = spl_token::instruction::close_account(
             token_program_acc.key,
@@ -424,6 +431,8 @@ impl Processor {
             .ok_or(EscrowError::AmountOverflow)?;
         **escrow_acc.lamports.borrow_mut() = 0;
         *escrow_acc.data.borrow_mut() = &mut [];
+
+        sol_log_compute_units();
 
         Ok(())
     }

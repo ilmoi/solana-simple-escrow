@@ -109,7 +109,7 @@ import {
   connect,
   CONNECTION,
   getBalance, getEscrowInfo,
-  getInfo,
+  getInfo, getTokenAccount,
   getTokenBalance, initEscrow, takeTrade,
 } from "@/sol-api";
 import {LAMPORTS_PER_SOL, PublicKey} from "@solana/web3.js";
@@ -119,21 +119,23 @@ import {connectWallet, takeTradeSigned} from "@/wallet-api";
 export default {
   data() {
     return {
+      x_mint: 'CY9MVr73ZNbYeRc9MbsTUmPEMDaZaG4RtLKTDFYrFrp3',
+      y_mint: 'FAxvcBWjdYfWUnMt2tLKNkrdm2JhtXTBY6ho8tekYiHv',
       // ----------------------------------------------------------------------------- Alice
       a_main: "Ga8HG4NzgcYkegLoJDmxJemEU1brewF2XZLNHd6B4wJ7",
-      a_x_acc: "BTUDi8DcxQzXp1KQ5p95dkuBgTtqirDxySZrXbM6nHPk", //todo derive automatically?
-      a_y_acc: "pLBauX3VV2QWJsnakYdAjHh193EuhZc6UMpdYT5DsCK", //todo derive automatically?
-      a_pk: "201,101,147,128,138,189,70,190,202,49,28,26,32,21,104,185,191,41,20,171,3,144,4,26,169,73,180,171,71,22,48,135,231,91,179,215,3,117,187,183,96,74,154,155,197,243,114,104,20,123,105,47,181,123,171,133,73,181,102,41,236,78,210,176", //todo sign using a wallet instead
+      a_x_acc: "", //BTUDi8DcxQzXp1KQ5p95dkuBgTtqirDxySZrXbM6nHPk
+      a_y_acc: "", //pLBauX3VV2QWJsnakYdAjHh193EuhZc6UMpdYT5DsCK
+      a_pk: "201,101,147,128,138,189,70,190,202,49,28,26,32,21,104,185,191,41,20,171,3,144,4,26,169,73,180,171,71,22,48,135,231,91,179,215,3,117,187,183,96,74,154,155,197,243,114,104,20,123,105,47,181,123,171,133,73,181,102,41,236,78,210,176",
       a_x_size: new BigNumber("10").toString(),
       a_y_size: new BigNumber("10").toString(),
       a_main_balance: new BigNumber("0").toString(),
       a_x_balance: new BigNumber("0").toString(),
       a_y_balance: new BigNumber("0").toString(),
       // ----------------------------------------------------------------------------- Bob
-      b_main: "Ga8HG4NzgcYkegLoJDmxJemEU1brewF2XZLNHd6B4wJ7",
-      b_x_acc: "993dEBeJvmoEUsVracRaYMALxYWvE3jwfh2bktE9mLKi", //todo derive automatically?
-      b_y_acc: "EYXaZeXZkBiPK5gG3U1prEj7S3iu14yh57pP7KGCUjBH", //todo derive automatically?
-      b_pk: "177,217,193,155,63,150,164,184,81,82,121,165,202,87,86,237,218,226,212,201,167,170,149,183,59,43,155,112,189,239,231,110,162,218,184,20,108,2,92,114,203,184,223,69,137,206,102,71,162,0,127,63,170,96,137,108,228,31,181,113,57,189,30,76", //todo sign using a wallet instead
+      b_main: "BxiV2mYXbBma1Kv7kxnn7cdM93oFHL4BhT9G23hiFfUP",
+      b_x_acc: "", //993dEBeJvmoEUsVracRaYMALxYWvE3jwfh2bktE9mLKi
+      b_y_acc: "", //EYXaZeXZkBiPK5gG3U1prEj7S3iu14yh57pP7KGCUjBH
+      b_pk: "177,217,193,155,63,150,164,184,81,82,121,165,202,87,86,237,218,226,212,201,167,170,149,183,59,43,155,112,189,239,231,110,162,218,184,20,108,2,92,114,203,184,223,69,137,206,102,71,162,0,127,63,170,96,137,108,228,31,181,113,57,189,30,76",
       b_x_size: new BigNumber("10").toString(),
       b_y_size: new BigNumber("10").toString(),
       b_main_balance: new BigNumber("0").toString(),
@@ -156,6 +158,12 @@ export default {
     // todo in theory I need to write custom handlers instead of v-model, which would transform entered integers into BigNumber but for this toy app cba
     //  just imagine numbers are hardcoded and can't be changed
 
+    async populateTokenAddresses() {
+      this.a_x_acc = await getTokenAccount(this.a_main, this.x_mint);
+      this.a_y_acc = await getTokenAccount(this.a_main, this.y_mint);
+      this.b_x_acc = await getTokenAccount(this.b_main, this.x_mint);
+      this.b_y_acc = await getTokenAccount(this.b_main, this.y_mint);
+    },
     async updateBalance() {
       this.a_main_balance = new BigNumber(`${(await getBalance(this.a_main) / LAMPORTS_PER_SOL)}`)
     },
@@ -269,6 +277,7 @@ export default {
   async created() {
     await connect();
     await this.updateAll();
+    await this.populateTokenAddresses();
   }
 }
 </script>
